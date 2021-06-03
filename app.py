@@ -1,9 +1,8 @@
-import json
 from datetime import datetime
 from flask import Flask
 from flask_restful import Resource, Api
-from models import db, Record
-from scraper import add_data_to_model, get_data
+from models import db, Record, Company
+from scraper import add_data_to_model, scrape_data, get_data_from_db
 
 
 app = Flask(__name__)
@@ -22,22 +21,25 @@ def before_first_request():
 class history(Resource):
     def get(self, symbol):
         if not last_scraped_date_dict.get(symbol) or datetime.now().date() - last_scraped_date_dict[symbol]:
-            add_data_to_model(get_data(symbol))
-        result = []
-        for record in Record.query.all():
-            result.append({
-                'date': datetime.strftime(record.date, '%d-%m-%Y'),
-                'high': record.high,
-                'low': record.low,
-                'close': record.close,
-                'adj_close': record.adj_close,
-                'volume': record.volume
-            })
+            add_data_to_model(scrape_data(symbol))
         last_scraped_date_dict[symbol] = datetime.now().date()
+        return get_data_from_db(symbol)
+
+
+class history_of_all_symbols_in_database(Resource):
+    def get(self):
+        result = dict()
+        for company in Company.query.all():
+            symbol = company.symbol
+            if not last_scraped_date_dict.get(symbol) or datetime.now().date() - last_scraped_date_dict[symbol]:
+                add_data_to_model(scrape_data(symbol))
+            last_scraped_date_dict[symbol] = datetime.now().date()
+            result[symbol] = get_data_from_db(symbol)
         return result
 
 
 api.add_resource(history, '/history/<string:symbol>')
+api.add_resource(history_of_all_symbols_in_database, '/history/')
 
 
 if __name__ == '__main__':

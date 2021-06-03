@@ -7,7 +7,7 @@ from urllib.parse import urlencode
 from models import Company, Record, db
 
 
-def get_data(symbol: str, start_date: int = 0, end_date: int = int(time.time())):
+def scrape_data(symbol: str, start_date: int = 0, end_date: int = int(time.time())):
     url_params = {
         'period1': start_date,
         'period2': end_date,
@@ -50,3 +50,15 @@ def add_data_to_model(data):
     db.session.commit()
 
 
+def get_data_from_db(symbol: str):
+    result = []
+    for record in Record.query.filter_by(company=Company.query.filter_by(symbol=symbol).first()):
+        result.append({
+            'date': datetime.strftime(record.date, '%d-%m-%Y'),
+            'high': record.high,
+            'low': record.low,
+            'close': record.close,
+            'adj_close': record.adj_close,
+            'volume': record.volume
+        })
+    return result
