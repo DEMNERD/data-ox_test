@@ -1,26 +1,28 @@
 from datetime import datetime
 from flask import Flask, request
 from flask_restful import Resource, Api
-from models import db, Record, Company
+from models import db, Company
 from scraper import add_data_to_model, scrape_data, get_data_from_db
 
 
 app = Flask(__name__)
 api = Api(app)
-last_scraped_date_dict = dict()
 app.config.from_object('config')
 db.init_app(app)
 
 
 @app.before_first_request
 def before_first_request():
+    global last_scraped_date_dict
+    last_scraped_date_dict = dict()
     db.drop_all()
     db.create_all()
 
 
 class history(Resource):
     def get(self, symbol):
-        if not last_scraped_date_dict.get(symbol):
+        print(last_scraped_date_dict)
+        if not Company.query.filter_by(symbol=symbol).first():
             return app.make_response(
                 ({'Status': 'Error', 'Description': f'Firstly you have to add {symbol} into the db'}, 404)
             )
@@ -32,6 +34,7 @@ class history(Resource):
 
 class history_without_args(Resource):
     def get(self):
+        print(last_scraped_date_dict, 'HIST')
         result = dict()
         for company in Company.query.all():
             symbol = company.symbol
@@ -42,16 +45,16 @@ class history_without_args(Resource):
         return result
 
     def post(self):
-        data = request.get_json()
-        symbol = data.get('symbol')
+        print(last_scraped_date_dict, 'POST')
+        symbol = request.get_json(force=True).get('Symbol')
         data = scrape_data(symbol)
         if not data:
             return app.make_response(
-                ({'Status': 'Error', 'Description': f'This company does not exist'}, 404)
+                ({'Status': 'Error', 'Description': 'This company does not exist'}, 404)
             )
-        add_data_to_model(data)
-        last_scraped_date_dict[symbol] = datetime.now().date()
-        if not last_scraped_date_dict.get(symbol):
+        if not Company.query.filter_by(symbol=symbol).first():
+            add_data_to_model(data)
+            last_scraped_date_dict[symbol] = datetime.now().date()
             return {'Status': 'Success', 'Description': f'Successfully added {symbol} into the db'}
 
 
