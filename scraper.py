@@ -17,13 +17,14 @@ def scrape_data(symbol: str, start_date: int = 0, end_date: int = int(time.time(
     resp = requests.get(
         f'https://query1.finance.yahoo.com/v7/finance/download/{symbol}?' + urlencode(url_params)
     )
-
     with StringIO(resp.text) as csv_file:
         reader = csv.reader(csv_file)
         params = next(reader)
         result = []
         for item in reader:
             result.append({params[i]: item[i] for i in range(len(params))})
+    if not result:
+        return False
 
     return {symbol: result}
 
@@ -52,7 +53,8 @@ def add_data_to_model(data):
 
 def get_data_from_db(symbol: str):
     result = []
-    for record in Record.query.filter_by(company=Company.query.filter_by(symbol=symbol).first()):
+    company = Company.query.filter_by(symbol=symbol).first()
+    for record in Record.query.filter_by(company=company):
         result.append({
             'date': datetime.strftime(record.date, '%d-%m-%Y'),
             'high': record.high,
